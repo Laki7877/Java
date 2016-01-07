@@ -12,6 +12,8 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
@@ -117,7 +119,6 @@ public class MainClass{
 		return panel;
 	}
 
-
 	protected static String generateHistoryReport(Date from, Date to, String sku, List<String> optionList) {
 		String filePath = StringUtils.EMPTY;
 		SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd");
@@ -127,7 +128,10 @@ public class MainClass{
 		}
 		String toDate = StringUtils.EMPTY;
 		if(to != null){
-			toDate = sf.format(to);
+			Calendar cal = Calendar.getInstance();
+			cal.setTime(to);
+			cal.add(Calendar.DATE, 1);
+			toDate = sf.format(cal.getTime());
 		}
 
 		if(StringUtils.isEmpty(toDate)
@@ -141,176 +145,57 @@ public class MainClass{
 			JOptionPane.showMessageDialog(null, "Please choose some option");
 			return null;
 		}
-
-
-		String mainQuery = "SELECT * FROM ( ";
-		boolean isSelected = false;
-		for (String option : optionList) {
-			if(isSelected){
-				mainQuery += "UNION ALL";
-			}
-			if("Purchase".equals(option)){
-				String query = " ( " + resourceBundle.getString("product.history.purchase") + " ) ";
-				mainQuery += query;
-				isSelected = true;
-			}else if("Movement".equals(option)){
-				String query = " ( " + resourceBundle.getString("product.history.movement") + " ) ";
-				mainQuery += query;
-				isSelected = true;
-			}else if("Shipment".equals(option)){
-				String query = " ( " + resourceBundle.getString("product.history.shipment") + " ) ";
-				mainQuery += query;
-				isSelected = true;
-			}else if("Refund".equals(option)){
-				String query = " ( " + resourceBundle.getString("product.history.refund") + " ) ";
-				mainQuery += query;
-				isSelected = true;
-			}else if("Stock Adjustment".equals(option)){
-				String query = " ( " + resourceBundle.getString("product.history.adjustment") + " ) ";
-				mainQuery += query;
-				isSelected = true;
-			}
-
-		}
-		mainQuery += " ) AS A WHERE ";
-		isSelected = false;
-		if(StringUtils.isNotEmpty(fromDate)){
-			mainQuery += "  A.STAMP_DATE >= '" + fromDate + "'";
-			isSelected = true;
-		}
-		if(StringUtils.isNotEmpty(toDate)){
-			if(isSelected){
-				mainQuery += " AND ";
-			}
-			mainQuery += " A.STAMP_DATE <= '" + toDate + "'";
-			isSelected = true;
-		}
-		if(StringUtils.isNotEmpty(sku)){
-			if(isSelected){
-				mainQuery += " AND ";
-			}
-			mainQuery += " A.PRODUCT_SKU = '" + sku + "'";
-			isSelected = true;
-		}
 		
-		String orderBy = resourceBundle.getString("product.history.order.by");
-		mainQuery += " " + orderBy;
-
 		ConnectDB db = null;
 		PreparedStatement prst = null;
 		ResultSet rs = null;
+		List<String> lines = new ArrayList<String>();
+		String header = "Date, Category, Name, SKU, PO Number, Delivered Qty, Source Warehouse, Qty, Destination Warehouse, Qty, Order No., Sold Qty, Refund Qty, Stock Adjust No., Qty Before Adjust, Qty After Adjust, Adjust Reason" ;
+		
 		try{
 			db = new ConnectDB();
-			prst = db.getConn().prepareStatement(mainQuery);
-			rs = prst.executeQuery();
-			if(rs!=null){
-				List<String> lines = new ArrayList<String>();
-				String header = "Date, SKU, PO Number, Delivered Qty, Source Warehouse, Qty, Destination Warehouse, Qty, Order No., Sold Qty, Refund Qty, Stock Adjust No., Qty Before Adjust, Qty After Adjust, Adjust Reason" ;
-				lines.add(header);
-				String line = null;
-				while(rs.next()){
-					String date = sf.format(rs.getDate("STAMP_DATE"));
-					String newSku = rs.getString("PRODUCT_SKU");
-					int poId = rs.getInt("PURCHASE_ID");
-					int delQty = rs.getInt("DEL_QTY");
-					String sourceWarehouse = rs.getString("FROM_WAREHOUSE");
-					int sourceQty = rs.getInt("FROM_QTY");
-					String destinationWarehouse = rs.getString("TO_WAREHOUSE");
-					int destinationQty = rs.getInt("TO_QTY");
-					String orderNumber = rs.getString("ORDER_NUMBER");
-					int shipQty = rs.getInt("SHIP_QTY");
-					int refundQty = rs.getInt("REFUND_QTY");
-					int adjId = rs.getInt("ADJ_ID");
-					int adjOld = rs.getInt("ADJ_OLD");
-					int adjNew = rs.getInt("ADJ_NEW");
-					String adjReason = rs.getString("ADJ_REASON");
-					
-					line = StringUtils.EMPTY;
-					line += date;
-					if(StringUtils.isEmpty(newSku)){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + newSku;
-					}
-					if(poId == 0){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + poId;
-					}
-					if(delQty == 0){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + delQty;
-					}
-					
-					if(StringUtils.isEmpty(sourceWarehouse)){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + sourceWarehouse.replace(",", "");
-					}
-					
-					if(sourceQty == 0){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + sourceQty;
-					}
-					
-					if(StringUtils.isEmpty(destinationWarehouse)){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + destinationWarehouse;
-					}
-					if(destinationQty == 0){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + destinationQty;
-					}
-					
-					if(StringUtils.isEmpty(orderNumber)){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + orderNumber;
-					}
-					
-					if(shipQty == 0){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + shipQty;
-					}
-					if(refundQty == 0){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + refundQty;
-					}
-					if(adjId == 0){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + adjId;
-					}
-					
-					line += "," + adjOld;
-					line += "," + adjNew;
-					
-					if(StringUtils.isEmpty(adjReason)){
-						line += "," + StringUtils.EMPTY;
-					}else{
-						line += "," + adjReason;
-					}
-					
-					lines.add(line);
+			
+			for (String option : optionList) {
+				if("Purchase".equals(option)){
+					String query = resourceBundle.getString("product.history.purchase");
+					String groupBy = resourceBundle.getString("product.history.group.by.purchase");
+					genEachHistory(query,lines,db,prst,rs,sf,fromDate,toDate,sku,"PO.purchase_on",true,groupBy);
+				}else if("Movement".equals(option)){
+					String query = resourceBundle.getString("product.history.movement");
+					String groupBy = resourceBundle.getString("product.history.group.by.movement");
+					genEachHistory(query,lines,db,prst,rs,sf,fromDate,toDate,sku,"SS.created_at",true,groupBy);
+				}else if("Shipment".equals(option)){
+					String query = resourceBundle.getString("product.history.shipment");
+					query += " WHERE ";
+					String groupBy = resourceBundle.getString("product.history.group.by.shipment");
+					genEachHistory(query,lines,db,prst,rs,sf,fromDate,toDate,sku,"O.created_at",false,groupBy);
+				}else if("Refund".equals(option)){
+					String query = resourceBundle.getString("product.history.refund");
+					query += " WHERE ";
+					String groupBy = resourceBundle.getString("product.history.group.by.refund");
+					genEachHistory(query,lines,db,prst,rs,sf,fromDate,toDate,sku,"M.created_at",false,groupBy);
+				}else if("Stock Adjustment".equals(option)){
+					String query = resourceBundle.getString("product.history.adjustment");
+					query += " WHERE ";
+					String groupBy = resourceBundle.getString("product.history.group.by.adjustment");
+					genEachHistory(query,lines,db,prst,rs,sf,fromDate,toDate,sku,"ADJ.created_at",false,groupBy);
 				}
-				SimpleDateFormat sfTime = new SimpleDateFormat("yyyy-MM-dd HHmmss");
-				File file = new File("History Report "+sfTime.format(new Date())+".csv");
-				file.createNewFile();
-				FileOutputStream fos = new FileOutputStream(file);
-				for (String string : lines) {
-					fos.write(string.getBytes());
-					fos.write("\n".getBytes());
-				}
-				fos.flush();
-				fos.close();
-				filePath = file.getAbsolutePath();
+
 			}
+			
+			SimpleDateFormat sfTime = new SimpleDateFormat("yyyy-MM-dd HHmmss");
+			File file = new File("History Report "+sfTime.format(new Date())+".csv");
+			file.createNewFile();
+			FileOutputStream fos = new FileOutputStream(file);
+			Collections.sort(lines);
+			lines.add(0,header);
+			for (String string : lines) {
+				fos.write(string.getBytes());
+				fos.write("\n".getBytes());
+			}
+			fos.flush();
+			fos.close();
+			filePath = file.getAbsolutePath();
 		}catch (Exception ex){
 			ex.printStackTrace();
 		}finally{
@@ -337,8 +222,152 @@ public class MainClass{
 
 		return filePath;
 	}
+	
+	private static void genEachHistory(String mainQuery,List<String> lines, ConnectDB db, PreparedStatement prst, ResultSet rs,SimpleDateFormat sf,
+			String fromDate, String toDate,String sku,String dateField, boolean isSelected,String groupBy) throws Exception{
+		
+		if(StringUtils.isNotEmpty(fromDate)){
+			if(isSelected){
+				mainQuery += " AND ";
+			}
+			mainQuery +=  " " + dateField + " >= '" + fromDate + "'";
+			isSelected = true;
+		}
+		if(StringUtils.isNotEmpty(toDate)){
+			if(isSelected){
+				mainQuery += " AND ";
+			}
+			mainQuery += " " + dateField + " <= '" + toDate + "'";
+			isSelected = true;
+		}
+		if(StringUtils.isNotEmpty(sku)){
+			if(isSelected){
+				mainQuery += " AND ";
+			}
+			mainQuery += " P.sku = '" + sku + "'";
+			isSelected = true;
+		}
+		
+		mainQuery += " " + groupBy;
+		
+		
+		prst = db.getConn().prepareStatement(mainQuery);
+		//prst.setString(1, dateField);
+		//prst.setString(1, dateField);
+		rs = prst.executeQuery();
+		if(rs!=null){
+			String line = null;
+			while(rs.next()){
+				//Date teee = rs.getDate("PO.purchase_on");
+				String date = rs.getString("STAMP_DATE");
+				String catName = rs.getString("CAT_NAME");
+				String productName = rs.getString("PRODUCT_NAME");
+				String newSku = rs.getString("PRODUCT_SKU");
+				int poId = rs.getInt("PURCHASE_ID");
+				int delQty = rs.getInt("DEL_QTY");
+				String sourceWarehouse = rs.getString("FROM_WAREHOUSE");
+				int sourceQty = rs.getInt("FROM_QTY");
+				String destinationWarehouse = rs.getString("TO_WAREHOUSE");
+				int destinationQty = rs.getInt("TO_QTY");
+				String orderNumber = rs.getString("ORDER_NUMBER");
+				int orderQty = rs.getInt("ORDER_QTY");
+				int refundQty = rs.getInt("REFUND_QTY");
+				int adjId = rs.getInt("ADJ_ID");
+				int adjOld = rs.getInt("ADJ_OLD");
+				int adjNew = rs.getInt("ADJ_NEW");
+				String adjReason = rs.getString("ADJ_REASON");
+				
+				line = StringUtils.EMPTY;
+				if(StringUtils.isEmpty(date)){
+					continue;
+				}
+				line += date;
+				if(StringUtils.isEmpty(catName)){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + catName;
+				}
+				if(StringUtils.isEmpty(productName)){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + productName;
+				}
+				if(StringUtils.isEmpty(newSku)){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + newSku;
+				}
+				if(poId == 0){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + poId;
+				}
+				if(delQty == 0){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + delQty;
+				}
+				
+				if(StringUtils.isEmpty(sourceWarehouse)){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + sourceWarehouse.replace(",", "");
+				}
+				
+				if(sourceQty == 0){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + sourceQty;
+				}
+				
+				if(StringUtils.isEmpty(destinationWarehouse)){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + destinationWarehouse;
+				}
+				if(destinationQty == 0){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + destinationQty;
+				}
+				
+				if(StringUtils.isEmpty(orderNumber)){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + orderNumber;
+				}
+				
+				if(orderQty == 0){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + orderQty;
+				}
+				if(refundQty == 0){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + refundQty;
+				}
+				if(adjId == 0){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + adjId;
+				}
+				
+				line += "," + adjOld;
+				line += "," + adjNew;
+				
+				if(StringUtils.isEmpty(adjReason)){
+					line += "," + StringUtils.EMPTY;
+				}else{
+					line += "," + adjReason;
+				}
+				
+				lines.add(line);
+			}
+		}
+	}
 
-	private static JPanel initiateSaleTab(){
+ 	private static JPanel initiateSaleTab(){
 		final UtilDateModel fromModel = new UtilDateModel();
 		fromModel.setSelected(false);
 		JDatePanelImpl datePanel = new JDatePanelImpl(fromModel, new Properties());
@@ -613,9 +642,6 @@ public class MainClass{
 			String orderBy = resourceBundle.getString("main.order.by");
 			mainQuery += " " + orderBy;
 
-
-
-
 			db = new ConnectDB();
 			prst = db.getConn().prepareStatement(mainQuery);
 			rs = prst.executeQuery();
@@ -640,6 +666,7 @@ public class MainClass{
 					double qty = rs.getDouble("QTY");
 					double cost = qty * rs.getDouble("COST");
 					double price = rs.getDouble("PRICE");
+					double discount = rs.getDouble("DISCOUNT_AMT");
 
 					while(price == 0){
 						if(rs.next()){
@@ -658,8 +685,13 @@ public class MainClass{
 					if(StringUtils.isNotEmpty(memoNum)){
 						double refundQty = rs.getDouble("QTY_REFUND");
 						qty = 0 - refundQty;
+						cost = 0-cost;
+						price *=  qty;
+						price += discount;
+					}else{
+						price *=  qty;
+						price -= discount;
 					}
-					price *=  qty;
 
 					line = StringUtils.EMPTY;
 					line += orderDate;
@@ -677,8 +709,6 @@ public class MainClass{
 					line += "," + sellMan;
 					lines.add(line);
 				}
-
-
 
 
 
@@ -720,6 +750,5 @@ public class MainClass{
 		}
 		return filePath;
 	}
-
 
 }
